@@ -36,10 +36,12 @@ curl.exe -X POST -H "Content-Type: application/json" -d '{\"directory\":\"intern
 
 Example 
 ```
-$ .\bin\counter.exe --word a --case=true --whole=true  
-2023/10/16 05:23:26 The word "a" appears 2 times in file internal\counter\count.go
-2023/10/16 05:23:26 The word "a" appears 2 times in total under the directory "internal"
-2
+$ .\bin\counter.exe --dir ./cmd/ --word func --case=true --whole=true  
+2023/10/16 06:02:08 The word "func" appears 2 times in file cmd\counter-server\main.go
+2023/10/16 06:02:08 The word "func" appears 1 times in file cmd\counter\main.go
+2023/10/16 06:02:08 The word "func" appears 3 times in total under the directory "./cmd/"
+3
 ```
 
 ## Tests
+Use tests runner.
