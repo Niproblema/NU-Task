@@ -8,12 +8,15 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 )
 
 type searchParams struct {
-	Word         string
-	RegexChecker *regexp.Regexp
+	Word          string
+	CaseSensitive bool
+	WholeOnly     bool
+	RegexChecker  *regexp.Regexp
 }
 
 type result struct {
@@ -121,8 +124,33 @@ func processFile(filePath string, searchParams *searchParams, processWG *sync.Wa
 					textContent = prefBuf + string(buf[:n])
 				}
 
-				count += len((*searchParams).RegexChecker.FindAllString(textContent, -1))
-				prefBuf = textContent[max(0, len(textContent)-wordLen):]
+				// Search
+				foundMatches := (*searchParams).RegexChecker.FindAllStringIndex(textContent, -1)
+				foundCount := len(foundMatches)
+
+				if !(*searchParams).WholeOnly {
+					prefBuf = textContent[max(0, len(textContent)-wordLen+1):]
+				} else {
+					// When searching whole words define overlapping support buffer differently
+					prefBuf = textContent[max(0, len(textContent)-wordLen):]
+					isAtEnd := strings.EqualFold(prefBuf, (*searchParams).Word)
+					matchAtEnd := false
+					if foundCount > 0 && isAtEnd && foundMatches[foundCount-1][1] == len(textContent) {
+						// Edge case when searching whole word and searched word appears at the end of the buffer - in such
+						// case it is required to read more data, to determine the following character and
+						// insure that word is really whole.
+						matchAtEnd = true
+						foundCount -= 1
+					}
+
+					if isAtEnd && !matchAtEnd {
+						// If searched word does not not match the end of the string, then it should be
+						// trimmed to avoid counting it twice.
+						prefBuf = prefBuf[1:]
+					}
+				}
+
+				count += foundCount
 			}
 
 			if err != nil && err != io.EOF {
@@ -141,7 +169,7 @@ func processFile(filePath string, searchParams *searchParams, processWG *sync.Wa
 func getSearchParams(word string, caseSensitive bool, wholeOnly bool) searchParams {
 	var regStr string
 	if wholeOnly {
-		regStr = `\b(` + word + `)\b`
+		regStr = `\b(` + regexp.QuoteMeta(word) + `)\b`
 	} else {
 		regStr = word
 	}
@@ -150,5 +178,5 @@ func getSearchParams(word string, caseSensitive bool, wholeOnly bool) searchPara
 		regStr = `(?i)` + regStr
 	}
 	cReg := regexp.MustCompile(regStr)
-	return searchParams{Word: word, RegexChecker: cReg}
+	return searchParams{Word: word, CaseSensitive: caseSensitive, WholeOnly: wholeOnly, RegexChecker: cReg}
 }
